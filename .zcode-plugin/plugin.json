@@ -1,0 +1,88 @@
+{
+  "name": "mathmodel",
+  "version": "0.1.0",
+  "description": "Autonomous mathematical-modelling agent: solves the model numerically, validates it, plots, and writes up. Runs headless with no confirmation step; the operator's instructions are the only authority.",
+  "author": { "name": "sun-zihang" },
+  "license": "MIT",
+  "homepage": "https://github.com/sun-zihang/mathmodel",
+  "repository": "https://github.com/sun-zihang/mathmodel",
+  "keywords": ["mathematical-modelling", "optimization", "linear-programming", "competition", "latex"],
+  "skills": "skills",
+  "commands": "commands",
+  "mcpServers": {
+    "mathmodel": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${ZCODE_PLUGIN_ROOT}/engine/mcp_server.py"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8",
+        "MATHMODEL_PLUGIN_ROOT": "${ZCODE_PLUGIN_ROOT}",
+        "MATHMODEL_DATA_DIR": "${ZCODE_PLUGIN_DATA}",
+        "MATHMODEL_PROVIDER_PREFER": "${user_config.provider_prefer}",
+        "MATHMODEL_MODEL": "${user_config.model}",
+        "MATHMODEL_MAX_STEPS": "${user_config.max_steps}",
+        "MATHMODEL_BLAST_RADIUS": "${user_config.blast_radius}",
+        "OPENAI_API_KEY": "${user_config.openai_api_key}",
+        "OPENAI_BASE_URL": "${user_config.openai_base_url}",
+        "ZAI_API_KEY": "${user_config.zai_api_key}",
+        "BIGMODEL_API_KEY": "${user_config.bigmodel_api_key}",
+        "JET_HUB_BASE_URL": "${user_config.jethub_base_url}",
+        "JET_HUB_KEY_FILE": "${user_config.jethub_key_file}"
+      }
+    }
+  },
+  "userConfig": {
+    "provider_prefer": {
+      "type": "string",
+      "default": "own_key,jethub",
+      "description": "Comma-separated route preference. 'own_key' uses the API keys you set below; 'jethub' uses the local jet-hub OpenAI-compatible gateway. ZCode's own plan quota is spent by ZCode running this loop, never by this server impersonating a token."
+    },
+    "model": {
+      "type": "string",
+      "default": "",
+      "description": "Model id for the chosen route. Empty means the route default. For the gateway, list them with the /models command."
+    },
+    "max_steps": {
+      "type": "string",
+      "default": "60",
+      "description": "Ceiling on ReAct turns per task. Guards against a looping model burning quota forever -- a runaway limit, not a moral one."
+    },
+    "blast_radius": {
+      "type": "string",
+      "default": "host",
+      "description": "'host' runs code directly on this machine with no guard rails. 'container' runs run_python inside docker (python:3.12-slim) so a hallucinated rm -rf cannot reach your disk. Your machine, your switch; the container option exists because undo is not a thing."
+    },
+    "openai_api_key": {
+      "type": "string",
+      "default": "",
+      "description": "API key for an OpenAI-compatible endpoint you own. Stored in ZCode plugin config, not in this repo."
+    },
+    "openai_base_url": {
+      "type": "string",
+      "default": "https://api.openai.com/v1",
+      "description": "Base URL for the own-key route."
+    },
+    "zai_api_key": {
+      "type": "string",
+      "default": "",
+      "description": "Your own Z.ai (GLM) API key, from the standard API -- separate from the ZCode plan login."
+    },
+    "bigmodel_api_key": {
+      "type": "string",
+      "default": "",
+      "description": "Your own bigmodel.cn API key."
+    },
+    "jethub_base_url": {
+      "type": "string",
+      "default": "http://127.0.0.1:8787/v1",
+      "description": "Local jet-hub gateway endpoint. This plugin only consumes it as a model server; it does not drive jet-hub's account rotation or check-in."
+    },
+    "jethub_key_file": {
+      "type": "string",
+      "default": "~/.dsh/openai-gateway/api-key",
+      "description": "Path the gateway key is read from. The key itself is never copied into this repo or into any report."
+    }
+  }
+}

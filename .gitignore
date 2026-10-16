@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.testsuite/
+.testdata/
+tests/out/
+out/
+sessions/
+*.univer
+.DS_Store
+
+# never commit credentials, however they are named locally
+*.key
+*.pem
+credentials*
+config.local.json
+.env

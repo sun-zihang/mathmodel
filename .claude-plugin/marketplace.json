@@ -1,0 +1,15 @@
+{
+  "name": "mathmodel",
+  "description": "Autonomous mathematical-modelling agent for ZCode: solves numerically, validates, plots, writes up.",
+  "owner": { "name": "sun-zihang" },
+  "plugins": [
+    {
+      "name": "mathmodel",
+      "description": "Headless mathematical-modelling agent with a persistent python kernel. No confirmation step; the operator is the only authority. Optional container blast radius.",
+      "version": "0.1.0",
+      "category": "research",
+      "tags": ["mathematical-modelling", "optimization", "linear-programming", "competition", "latex"],
+      "source": "./"
+    }
+  ]
+}
