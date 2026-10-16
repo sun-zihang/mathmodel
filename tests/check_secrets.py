@@ -145,8 +145,12 @@ def blobs():
     """
     if "--worktree" in sys.argv:
         out = []
-        for line in subprocess.run(["git", "ls-files"],
-                                   capture_output=True, text=True).stdout.splitlines():
+        # --others --exclude-standard matters: a gate limited to TRACKED files
+        # skipped exactly the new files about to be committed and pushed, which
+        # is the one moment a publish gate has to work. Ignored files stay out.
+        for line in subprocess.run(
+                ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+                capture_output=True, text=True).stdout.splitlines():
             try:
                 with open(line, encoding="utf-8", errors="replace") as fh:
                     out.append(("worktree", line, fh.read()))
