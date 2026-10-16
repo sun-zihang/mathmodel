@@ -1,0 +1,46 @@
+name: tests
+# The four suites are the plugin's contract. They must pass on a clean machine
+# with no ZCode, no jet-hub, and no credentials -- otherwise "it works" here
+# means nothing to anyone installing this.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: install (scipy present, so both solver paths are exercised)
+        run: pip install scipy numpy matplotlib sympy pandas
+      - name: unit
+        run: python tests/test_tools.py
+      - name: manifest wiring
+        run: python tests/test_manifest.py
+      - name: mcp protocol
+        run: python tests/test_smoke.py
+      - name: promises
+        run: python tests/test_promises.py
+
+  # The interesting case: a machine with NO scipy. Proves the pure-simplex
+  # fallback and the ASCII-plot fallback are real, not aspirational.
+  no-optional-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: stdlib only
+        run: |
+          python tests/test_manifest.py
+          python tests/test_promises.py
+          python tests/check_no_scipy.py

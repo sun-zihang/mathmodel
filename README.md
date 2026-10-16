@@ -57,6 +57,11 @@ here is `mathmodel@mathmodel`:
 }
 ```
 
+> Path B resolves the repo over plain `git`, so it needs the repository to be
+> **public** (or your git credentials to already work for GitHub). On a private
+> repo, use path A, or point `source` at `git` with an `https://user:token@…`
+> URL that never lands in a commit.
+
 Restart ZCode. The MCP server is spawned as `python engine/mcp_server.py`, so
 `python` must be on `PATH`, and for the modelling tools:
 
