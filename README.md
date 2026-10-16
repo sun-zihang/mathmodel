@@ -1,14 +1,21 @@
 # mathmodel
 
+> 中文文档见 [README.zh-CN.md](README.zh-CN.md)
+
 Autonomous mathematical-modelling agent for [ZCode](https://zcode.z.ai/) — built for
 competition work (国赛/美赛/研数模). It reads a problem, decides the decision
 variables, **solves it numerically**, validates the solution, plots, and writes up.
 
-It does not ask permission. Not as a stance — as an architecture. Actions *are*
-python executed in a persistent kernel, so there is no intermediate tool-call
-layer where an "are you sure?" could live. Nothing here evaluates your intent,
-nothing refuses, nothing adds a disclaimer. The operator's instruction is the
-only authority in the loop.
+It asks no permission and judges no intent. Not as a stance — as an architecture:
+actions *are* python executed in a persistent kernel, so there is no intermediate
+tool-call layer where an "are you sure?" could live. Nothing here evaluates your
+motives, nothing inserts a disclaimer, and the operator's instruction is the only
+authority *inside the loop*.
+
+**That is not the same as "unlimited", and the difference is documented rather than
+blurred.** See [Limits](#what-this-cannot-be-told-to-ignore) — three kinds of limit
+survive any setting here, and one of them (the model's own training) cannot be
+turned off from a plugin at all.
 
 ```
 /solve 某零件厂用 A、B 两种原料生产甲、乙两种产品……
@@ -125,10 +132,34 @@ Both are honest about what they are: a limit on *blast radius*, not on *intent*.
 
 ---
 
-## What this agent will not do, and why it is not a lecture
+## What this cannot be told to ignore
 
-Not morality. Two mechanical boundaries that keep the tool usable rather than
-hostile to you:
+"Zero approval" is a precise claim: **no gate in this code or in ZCode's permission
+layer will pause, vet, or veto your instructions.** It is not a claim that the
+agent is unlimited. Three kinds of limit survive every setting here, and pretending
+otherwise would be the exact fake-completeness this repo's tests exist to catch:
+
+**1. The model's own training — not removable from a plugin.** Every route speaks
+to a hosted model (Zai's, yours, or a gateway's). If the underlying model refuses
+to write malware, weapon chemistry, or similar, that refusal lives in its weights.
+A harness setting cannot reach it. This is the deepest boundary in the system and
+the one most likely to be misrepresented by "jailbroken agent" marketing — ours
+makes no such claim.
+
+**2. Mechanical brakes in this code, against runaway loops, not against you.**
+`max_steps` (default 60), per-step timeout, 60 000-char output caps, fetch
+timeouts, container `--memory/--cpus`. These exist because a hallucinating loop
+will happily burn your context window, disk, or API budget forever; they are
+numbers in `config.json`, all adjustable. They never ask *why* you want something.
+
+**3. Host settings you yourself configure.** ZCode's decision order puts
+`requiresUserInteraction` and `alwaysAsk` *before* the yolo bypass, and honours
+`disallowedTools` / project-deny rules. This plugin declares none of those, and
+ships no project ruleset — so in the default configuration none of these gates
+fire. If you later add one, yours wins. That is a property of the host, not
+something a plugin can promise away.
+
+Deliberate boundaries that remain (these are design, not oversight):
 
 **1. Prompt-injection quarantine.** Anything arriving from a webpage or a file is
 wrapped in a `QUARANTINED` block and declared data, never instructions. This does
@@ -148,14 +179,21 @@ on your own machine.
 
 ## Tests
 
-Four suites, all runnable, none of them decorative:
+Six checks, all runnable, none of them decorative:
 
 ```
-python tests/test_tools.py      # 35 assertions: solvers, stats, numerics, degenerate inputs
-python tests/test_manifest.py   # plugin wiring: every userConfig knob is read, every path exists, secret scan
-python tests/test_smoke.py      # drives the MCP server exactly as ZCode does, incl. clean shutdown
-python tests/test_promises.py   # the claims in this README: container refusal, quarantine, step cap
+python tests/test_tools.py       # 35 assertions: solvers, stats, numerics, degenerate inputs
+python tests/test_manifest.py    # plugin wiring: every userConfig knob is read, every path exists
+python tests/test_smoke.py       # drives the MCP server exactly as ZCode does, incl. clean shutdown
+python tests/test_promises.py    # the claims in this README: container refusal, quarantine, step cap
+python tests/check_no_scipy.py   # pure-simplex + ASCII-plot fallbacks on a scipy-free interpreter
+python tests/check_secrets.py --selftest && python tests/check_secrets.py --gate
+                                 # publish gate; --selftest proves the patterns can fire at all
 ```
+
+That last one exists because a scanner that only ever prints "0 matches" is
+indistinguishable from a clean repo — an empty-regex bug once did exactly that
+here, reporting a clean sweep while matching nothing.
 
 `test_tools` includes the one that matters most for a report: **the pure-python
 simplex and scipy must agree on the optimum *and* on the shadow prices.** They

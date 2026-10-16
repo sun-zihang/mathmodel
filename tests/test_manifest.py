@@ -136,24 +136,40 @@ else:
     MARKET_ID = None
 
 # 8. README claims must match reality, or the docs are a second source of lies.
-readme = os.path.join(ROOT, "README.md")
-if os.path.exists(readme):
-    r = open(readme, encoding="utf-8").read()
-    if MARKET_ID and MARKET_ID in r:
-        ok(f"README's marketplace-install id is real: {MARKET_ID}")
-    elif MARKET_ID:
-        bad(f"README enables the wrong id; should contain {MARKET_ID!r}")
-    # The other install path: a dirs-sourced plugin gets id name@inline and is
-    # enabled by default. Documenting the wrong id here makes people add a dead
-    # enabledPlugins entry and conclude the plugin "does not load".
-    if f"{m['name']}@inline" in r:
-        ok("README names the dirs-source id correctly (mathmodel@inline)")
+#    Both language versions are checked: a translated README that drifts from the
+#    English one is worse than no translation, because readers assume parity.
+DOC_CASES = {
+    "README.md": ("mathmodel@mathmodel", "mathmodel@inline",
+                  "cannot be told to ignore"),
+    "README.zh-CN.md": ("mathmodel@mathmodel", "mathmodel@inline",
+                        "不能声称能绕过"),
+}
+for doc, (market_kw, inline_kw, limits_kw) in DOC_CASES.items():
+    p = os.path.join(ROOT, doc)
+    if not os.path.exists(p):
+        bad(f"{doc} missing")
+        continue
+    r = open(p, encoding="utf-8").read()
+    if MARKET_ID and MARKET_ID not in r:
+        bad(f"{doc} enables the wrong id; should contain {MARKET_ID!r}")
     else:
-        bad("README omits or misstates the @inline id for plugins.dir installs")
+        ok(f"{doc}: marketplace id {MARKET_ID}")
+    if not r.count(inline_kw):
+        bad(f"{doc} misstates the @inline id for plugins.dir installs")
+    else:
+        ok(f"{doc}: names the dirs-source id ({inline_kw})")
     for tool in ("run_task", "run_python", "blast_radius", "list_models"):
         if f"__{tool}" not in r:
-            bad(f"README omits tool mcp__mathmodel__{tool}")
-    ok("README tool names match tools/list")
+            bad(f"{doc} omits tool mcp__mathmodel__{tool}")
+    # The honesty clause: a README that promises "no limits" is a false one.
+    if limits_kw not in r:
+        bad(f"{doc} lacks the limits section -- overclaiming zero restrictions")
+    else:
+        ok(f"{doc}: states its own limits rather than claiming none")
+    for banned in ("无限制", "unlimited", "no limits", "绝对自由"):
+        if banned in r and "not the same as" not in r and "不等于" not in r:
+            bad(f"{doc} says {banned!r} without qualifying it")
+    ok(f"{doc}: no bare 'unlimited' claim")
 
 print(f"\n{'PASS' if not FAIL else 'FAIL'}: {len(FAIL)} problem(s)")
 sys.exit(1 if FAIL else 0)
