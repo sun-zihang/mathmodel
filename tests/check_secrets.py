@@ -43,7 +43,15 @@ WHO = {
     # one. The selftest below asserts both forms, not just the one it likes.
     "windows local user path": r"\\{1,2}Users\\{1,2}(?!\$|\{|\[|\*)",
     "absolute drive path": r"[A-Za-z]:\\{1,2}(?:Users|Documents)\\{1,2}[\w.\-]+",
-    "machine hostname shape": r"\b[a-z]+-[a-z]+-\d+\b",
+    # Trailing digit run must be 2+ digits. A single digit is a version suffix,
+    # not a host: the pattern flagged the public slug '...-gen-5' in a README
+    # while the genuine 4-digit host fixture still fires -- the selftest proves
+    # the tightening cost no real detection. A host ending in exactly one digit
+    # is missed, which is the honest trade. (No literal example may be written
+    # in this file's prose: the gate scans it, and a typed-out host pattern here
+    # would be waived only if it existed in an OLD commit. It does not. Learned
+    # twice now.)
+    "machine hostname shape": r"\b[a-z]+-[a-z]+-\d{2,}\b",
 }
 # An empty regex matches at every position, so a missing env var once injected a
 # pattern that hit every line -- and the loop's skip guard turned the whole pass
