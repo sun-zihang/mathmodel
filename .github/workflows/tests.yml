@@ -29,6 +29,13 @@ jobs:
         run: python tests/test_smoke.py
       - name: promises
         run: python tests/test_promises.py
+      # A publish gate that only ever ran on one laptop is not a gate. Re-derives
+      # the scan against the checked-out tree so a future commit cannot leak a
+      # credential into a public repo. HEAD mode, since CI checks out shallow.
+      - name: credential + identity sweep (selftest first)
+        run: |
+          python tests/check_secrets.py --selftest
+          python tests/check_secrets.py --gate
 
   # The interesting case: a machine with NO scipy. Proves the pure-simplex
   # fallback and the ASCII-plot fallback are real, not aspirational.
