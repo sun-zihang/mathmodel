@@ -57,15 +57,22 @@ for i, e in enumerate(extra):
 def selftest():
     """Prove the patterns fire, and that clean lines do not. A gate that always
     prints 0 is theatre."""
+    # Fixtures are assembled by concatenation, never written intact. This file is
+    # scanned like everything else, and three literal fixtures once made the
+    # pushed repo trip its own gate. The scan loop exempts a small budget of
+    # lines here (the rule definitions themselves), but fixtures are NOT
+    # exempted -- so they must not contain a live pattern, and if one ever does,
+    # the gate fails rather than waving it through.
+    bs = chr(92)
     cases = {
         "github token": "export GH=ghp_" + "A" * 36,
         "openai-style key": 'OPENAI_API_KEY = "sk-' + "b" * 32 + '"',
         "aws key id": "aws_access_key_id = AKIA" + "Q" * 16,
-        "private key block": "-----BEGIN RSA PRIVATE KEY-----",
-        "bearer literal": "authorization: Bearer " + "eyJz" * 8,
+        "private key block": "--" + "BEGIN RSA PRIV" + "ATE KEY--",
+        "bearer literal": "auth" + "orization: Bearer " + "eyJz" * 8,
         "jwt": ("eyJ" + "hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
                 + "." + "eyJ" + "zdWIiOiIxMjM0NTY3ODkwIn0"),
-        "inline api key assignment": 'api_key = "s3cr3t-value-long-enough"',
+        "inline api key assignment": 'api' + '_key = "s3cr3t-value-long-enough"',
     }
     bad = 0
     for label, line in cases.items():
@@ -85,7 +92,9 @@ def selftest():
                                      ("JSON escaped, two seps", 'D:\\' + bs + 'Users' + bs + '"bob"')],
         "absolute drive path": [("plain, with tail", "D:" + bs + bs + "Users" + bs + bs + "bob" + bs + "proj"),
                                 ("single sep form", "C:" + bs + "Documents" + bs + "carol" + bs + "x")],
-        "machine hostname shape": [("hostname in prose", "host work-laptop-9931 up")],
+        # Split so the SOURCE holds no two-word+digits hostname; the runtime
+        # string still matches, which is what selftest has to prove.
+        "machine hostname shape": [("hostname in prose", "host work-lap" + "top-9931 up")],
     }
     for label, cases in pii_cases.items():
         for desc, line in cases:
@@ -106,9 +115,24 @@ def selftest():
 
 
 def blobs():
-    """(commit, path) pairs. --all-history covers every commit, because a public
-    repo publishes its history and a token in commit 1 stays leaked after commit
-    2 deletes it from the tree."""
+    """(origin, path, text) triples.
+
+    HEAD by default; --all-history covers every commit, because a public repo
+    publishes its history and a token in commit 1 stays leaked after commit 2
+    deletes it from the tree. --worktree scans the files on disk instead, which
+    is what you want BEFORE committing -- an audit that can only ever describe
+    the past cannot stop you pushing a secret; it can only report one.
+    """
+    if "--worktree" in sys.argv:
+        out = []
+        for line in subprocess.run(["git", "ls-files"],
+                                   capture_output=True, text=True).stdout.splitlines():
+            try:
+                with open(line, encoding="utf-8", errors="replace") as fh:
+                    out.append(("worktree", line, fh.read()))
+            except OSError as e:
+                print(f"  ?? unreadable {line}: {e}")
+        return out
     if "--all-history" in sys.argv:
         seen, pairs = set(), []
         for commit in subprocess.run(["git", "log", "--all", "--format=%H"],
@@ -118,8 +142,12 @@ def blobs():
                 if (commit, line) not in seen:
                     seen.add((commit, line))
                     pairs.append((commit, line))
-        return pairs
-    return [("HEAD", p) for p in subprocess.run(
+        return [(c, p, subprocess.run(["git", "show", f"{c}:{p}"],
+                 capture_output=True, text=True, encoding="utf-8",
+                 errors="replace").stdout) for c, p in pairs]
+    return [("HEAD", p, subprocess.run(
+        ["git", "show", f"HEAD:{p}"], capture_output=True, text=True,
+        encoding="utf-8", errors="replace").stdout) for p in subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", "HEAD"],
         capture_output=True, text=True, check=True).stdout.split()]
 
@@ -129,31 +157,23 @@ if "--selftest" in sys.argv:
 
 hits = 0
 targets = blobs()
-for commit, path in targets:
-    blob = subprocess.run(["git", "show", f"{commit}:{path}"],
-                          capture_output=True, text=True, encoding="utf-8",
-                          errors="replace")
-    if blob.returncode != 0:
-        print(f"  ?? unreadable {path}")
-        continue
-    for line_no, line in enumerate(blob.stdout.splitlines(), 1):
-        # Only this file gets an exemption, and only on lines that define rules.
-        # A blanket "skip anything mentioning re.compile" would let a secret hide
-        # on such a line: a silent false negative is far worse than one noisy
-        # false positive in a publish gate.
-        if path.endswith("tests/check_secrets.py") and any(
-                k in line for k in ("PATTERNS", "WHO = {", "re.compile", 'r"')):
-            continue
+for origin, path, text in targets:
+    for line_no, line in enumerate(text.splitlines(), 1):
+        # NO exemptions. Earlier revisions skipped this file's own rule-definition
+        # lines by keyword -- a hole you can fall through, since a real secret
+        # sharing a line with the word re.compile would have been waved past.
+        # The fixtures were built by concatenation instead, so this file holds no
+        # live pattern and the scan stays strict everywhere, including here.
         for label, pat in PATTERNS.items():
             if BENIGN.search(line):
                 continue
             for m in re.finditer(pat, line):
                 hits += 1
-                print(f"  CRED {label}: {path}:{line_no}: {m.group(0)[:52]!r}")
+                print(f"  CRED {label}: {origin}:{path}:{line_no}: {m.group(0)[:52]!r}")
         for label, pat in WHO.items():
             for m in re.finditer(pat, line, re.I):
                 hits += 1
-                print(f"  PII  {label}: {path}:{line_no}: {m.group(0)[:52]!r}")
+                print(f"  PII  {label}: {origin}:{path}:{line_no}: {m.group(0)[:52]!r}")
 
 print(f"\n{len(targets)} blobs scanned, {hits} match(es)")
 if "--gate" in sys.argv:
